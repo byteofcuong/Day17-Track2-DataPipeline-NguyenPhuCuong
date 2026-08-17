@@ -231,7 +231,7 @@ lớn. Idempotent không nhất thiết phải đắt; đắt hay không nằm �
 Bài được làm trên Windows nên `Makefile` có hai chỉnh sửa nhỏ, **không đụng tới logic
 chấm điểm** và vẫn chạy y như cũ trên Linux/macOS:
 
-- `PYBIN` tự dò `\.venv/Scripts` (Windows) hay `.venv/bin` (Linux/macOS) thay vì hard-code
+- `PYBIN` tự dò `.venv/Scripts` (Windows) hay `.venv/bin` (Linux/macOS) thay vì hard-code
   `bin/`; target `setup` dùng `python3` nếu có, không thì `python`.
 - `export PYTHONUTF8 := 1` - mọi file trong repo là UTF-8, còn locale mặc định của Windows
   là cp1252 khiến dbt đọc `dbt_project.yml` lỗi `UnicodeDecodeError`. Trên Linux biến này
