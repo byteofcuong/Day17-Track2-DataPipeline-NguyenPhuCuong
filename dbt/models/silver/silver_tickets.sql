@@ -35,7 +35,21 @@
 
 {{ config(materialized = 'table') }}
 
-with ranked as (
+-- Bước 1 — LỌC: bỏ những BẢN GHI CDC mà macro không chuẩn hoá được. Phải làm
+-- trước khi xếp hạng, nếu không một bản ghi hỏng nằm ở vị trí mới nhất sẽ kéo
+-- theo cả ticket biến mất khỏi Silver. Những bản ghi bị bỏ ở đây xuất hiện
+-- nguyên vẹn trong quarantine_tickets (cùng macro, không thể lệch nhau).
+with valid as (
+
+    select *
+    from {{ source('bronze', 'bronze_tickets_cdc') }}
+    where {{ normalize_priority('priority_raw') }} is not null
+
+),
+
+-- Bước 2 — XẾP HẠNG trên phần còn lại: ticket có bản ghi mới nhất bị hỏng vẫn
+-- giữ được trạng thái hợp lệ của lần cập nhật trước đó.
+ranked as (
 
     select
         *,
@@ -44,7 +58,7 @@ with ranked as (
             partition by ticket_id
             order by event_time desc, cdc_seq desc
         ) as _rn
-    from {{ source('bronze', 'bronze_tickets_cdc') }}
+    from valid
 
 ),
 

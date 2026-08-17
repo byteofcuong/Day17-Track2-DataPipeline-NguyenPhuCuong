@@ -33,8 +33,18 @@ with DAG(
     # TODO (nhiệm vụ 1): hai tham số dưới đây quyết định chuyện gì xảy ra
     # khi ai đó bấm Clear Task, và khi DAG bị dồn nhiều lần chạy cùng lúc.
     # Đọc lại triệu chứng ở phiếu #1041 rồi đặt lại cho đúng.
-    catchup=True,
-    # max_active_runs=?
+    #
+    # catchup=False: không tự schedule chạy bù mọi ngày trong quá khứ khi DAG
+    #   bị pause/bật lại — mỗi lần chạy bù là một lần ghi lại vào cùng bảng.
+    # max_active_runs=1: hai run không được phép ghi đồng thời vào cùng một
+    #   bảng đích; Clear Task lúc run khác đang chạy sẽ phải xếp hàng.
+    #
+    # Lưu ý: hai tham số này chỉ GIẢM TẦN SUẤT kích hoạt lỗi, chúng không phải
+    # nguyên nhân. Nguyên nhân nằm ở model không idempotent (xem
+    # models/gold/gold_training_set.sql) — một pipeline đúng phải chịu được
+    # việc chạy lại bao nhiêu lần cũng cho cùng kết quả.
+    catchup=False,
+    max_active_runs=1,
     # ------------------------------------------------------------------
 ) as dag:
 

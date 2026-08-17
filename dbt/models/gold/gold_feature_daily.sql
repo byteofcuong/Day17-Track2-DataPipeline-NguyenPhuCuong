@@ -29,9 +29,14 @@
 --   rõ hai vấn đề này tách nhau.
 -- ---------------------------------------------------------------------------
 
+-- Grain gồm HAI cột (event_date, customer_id) nên unique_key là một list.
+-- Cần khoá vì lookback window bên dưới khiến cùng một cặp được tính lại ở
+-- nhiều lượt chạy: không có khoá thì các lần tính cộng dồn thay vì thay thế.
 {{ config(
-    materialized     = 'incremental',
-    on_schema_change = 'fail'
+    materialized         = 'incremental',
+    unique_key           = ['event_date', 'customer_id'],
+    incremental_strategy = 'merge',
+    on_schema_change     = 'fail'
 ) }}
 
 select
@@ -49,7 +54,11 @@ select
 from {{ ref('silver_events') }}
 
 {% if is_incremental() %}
-where event_date > (select max(event_date) from {{ this }})
+-- Lookback window: tính lại cả những ngày đã chạy xong, vì dữ liệu của chúng
+-- vẫn còn đang tới. Độ rộng lấy theo P99 của (_ingested_at - event_time) đo
+-- trên bronze_events (≈2,7 ngày) làm tròn lên -> 3 ngày.
+where event_date >= (select max(event_date) from {{ this }})
+                    - interval {{ var('lookback_days', 3) }} day
 {% endif %}
 
 group by 1, 2, 3, 4

@@ -35,4 +35,7 @@ from {{ source('bronze', 'bronze_tickets_cdc') }}
 
 -- TODO(nhiệm vụ 3): thay `false` bằng điều kiện "priority không chuẩn hoá
 -- được". Khi còn `false`, bảng rỗng và make verify báo 0 / <số kỳ vọng>.
-where false
+--
+-- Dùng đúng macro mà silver_tickets dùng: bản ghi nào macro trả về NULL thì
+-- bị loại khỏi Silver và rơi vào đây — không thừa, không thiếu.
+where {{ normalize_priority('priority_raw') }} is null

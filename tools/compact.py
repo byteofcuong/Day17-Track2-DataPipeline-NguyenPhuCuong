@@ -63,27 +63,50 @@ def main() -> int:
     n_src = len(list(SRC.glob("*.parquet")))
     print(f"  nguồn : {SRC}  ({n_src:,} file)")
 
-    # TODO(nhiệm vụ 4): hiện thực khung COPY ... TO ... ở phần docstring.
+    # Ba quyết định của khung COPY ... TO ... (lý giải trong REPORT.md):
     #
-    #   con.execute(f"""
-    #       copy (
-    #           select * from read_parquet('{SRC}/*.parquet')
-    #           order by ...
-    #       ) to '{DST}' (
-    #           format parquet,
-    #           partition_by (...),
-    #           overwrite_or_ignore,
-    #           row_group_size ...
-    #       )
-    #   """)
+    #   partition_by (event_date)
+    #       Dashboard lọc theo MỘT ngày. event_date có đúng 14 giá trị -> 14
+    #       thư mục, engine loại 13/14 dataset chỉ bằng đường dẫn, trước khi
+    #       mở bất kỳ file nào. Partition theo customer_id (650 giá trị) thì
+    #       lại đẻ ra 650 thư mục nhỏ — tái tạo đúng small-file problem.
     #
-    # Sau đó kiểm tra không mất hàng nào:
+    #   order by customer_name, event_time
+    #       Điều kiện lọc thứ hai là customer_name. Xếp các hàng cùng khách
+    #       nằm liền nhau thì min/max của mỗi row group hẹp lại, engine bỏ
+    #       qua được row group không chứa 'ACME'. Dataset cũ xếp ngẫu nhiên
+    #       nên mọi row group đều có min='ACME' -> statistics vô dụng.
     #
-    #   assert <số row dataset cũ> == <số row dataset mới>
+    #   row_group_size 10_000
+    #       Một ngày khoảng 9.300 hàng. Để mặc định 122.880 thì cả ngày gói
+    #       trong MỘT row group, min/max phủ toàn bộ khách hàng và mất tác
+    #       dụng lọc. 10.000 chia ngày thành vài row group vẫn đủ lớn để
+    #       không rơi lại vào small-file problem.
+    con.execute(f"""
+        copy (
+            select * from read_parquet('{SRC}/*.parquet')
+            order by customer_name, event_time
+        ) to '{DST}' (
+            format          parquet,
+            partition_by    (event_date),
+            overwrite_or_ignore,
+            row_group_size  10000
+        )
+    """)
 
-    print("\n  tools/compact.py chưa được hiện thực — đây là nhiệm vụ 4.")
-    print("  Mở file này, đọc phần KHUNG THỰC HIỆN ở đầu file và điền vào TODO.")
-    print("  Hướng dẫn từng bước: GUIDE.md mục 4.\n")
+    n_rows_src = con.execute(
+        f"select count(*) from read_parquet('{SRC}/*.parquet')").fetchone()[0]
+    n_rows_dst = con.execute(
+        f"select count(*) from read_parquet('{DST}/**/*.parquet', "
+        f"hive_partitioning = 1)").fetchone()[0]
+    n_dst = len(list(DST.rglob("*.parquet")))
+
+    # Nén lại là bài toán layout, không phải bài toán lọc bớt dữ liệu.
+    assert n_rows_src == n_rows_dst, f"mất hàng: {n_rows_src} -> {n_rows_dst}"
+
+    print(f"  đích  : {DST}  ({n_dst:,} file)")
+    print(f"  hàng  : {n_rows_src:,} -> {n_rows_dst:,}  (không mất hàng nào)")
+    print(f"\n  xong. Đo lại bằng: python tools/explain.py\n")
     return 0
 
 

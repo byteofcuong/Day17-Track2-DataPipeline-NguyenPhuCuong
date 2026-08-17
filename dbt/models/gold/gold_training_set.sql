@@ -24,9 +24,15 @@
 --   backfill một ngày không phải quét lại toàn bộ lịch sử. Giữ nguyên nó.
 -- ---------------------------------------------------------------------------
 
+-- Grain là ENTITY (1 hàng / 1 ticket), khoá tự nhiên là ticket_id. Nguồn CDC
+-- có op='u', nên cùng một ticket đi qua mệnh đề WHERE bên dưới ở HAI ngày
+-- khác nhau: ngày tạo và ngày sửa. Vì thế xoá theo partition ngày không đủ —
+-- phải upsert theo KHOÁ để lần ghi sau thay thế lần ghi trước.
 {{ config(
-    materialized     = 'incremental',
-    on_schema_change = 'fail'
+    materialized         = 'incremental',
+    unique_key           = 'ticket_id',
+    incremental_strategy = 'merge',
+    on_schema_change     = 'fail'
 ) }}
 
 select

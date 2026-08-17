@@ -54,7 +54,21 @@
     --         ...
     --         else null                        -- nhóm 3
     --     end
-    try_cast({{ col }} as integer)
+    case
+        -- Nhóm 1 — đã là số và nằm trong miền contract: giữ nguyên.
+        --   `between 1 and 4` là phần try_cast một mình không làm được:
+        --   '0', '5', '-1' đúng là integer nhưng sai contract.
+        when try_cast({{ col }} as integer) between 1 and 4
+            then try_cast({{ col }} as integer)
+        -- Nhóm 2 — nhãn chữ từ 2026-08-10 (schema evolution, không phải lỗi):
+        --   quy về số theo tài liệu API của team backend.
+        when lower(trim({{ col }})) = 'urgent' then 1
+        when lower(trim({{ col }})) = 'high'   then 2
+        when lower(trim({{ col }})) = 'medium' then 3
+        when lower(trim({{ col }})) = 'low'    then 4
+        -- Nhóm 3 — 'P1', 'unknown', '0', '5', '-1', '', NULL: dữ liệu hỏng.
+        else null
+    end
 {% endmacro %}
 
 
@@ -65,5 +79,11 @@
 #}
 {% macro priority_reject_reason(col) %}
     -- TODO(nhiệm vụ 3, không bắt buộc): phân biệt các loại lỗi khác nhau.
-    'priority không quy đổi được về 1..4'
+    case
+        when {{ col }} is null                    then 'priority thiếu (NULL)'
+        when trim({{ col }}) = ''                 then 'priority rỗng'
+        when try_cast({{ col }} as integer) is not null
+            then 'priority là số nhưng ngoài miền 1..4: ' || {{ col }}
+        else 'priority là chuỗi không có trong bảng quy đổi: ' || {{ col }}
+    end
 {% endmacro %}

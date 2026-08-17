@@ -1,11 +1,17 @@
 SHELL   := /bin/bash
 VENV    := .venv
-PY      := $(VENV)/bin/python
-PIP     := $(VENV)/bin/pip
-DBT     := $(VENV)/bin/dbt
+# venv của Linux/macOS đặt binary ở bin/, của Windows đặt ở Scripts/ — tự dò
+# để cùng một Makefile chạy được trên cả hai.
+PYBIN   := $(if $(wildcard $(VENV)/Scripts/python.exe),$(VENV)/Scripts,$(VENV)/bin)
+PY      := $(PYBIN)/python
+PIP     := $(PYBIN)/pip
+DBT     := $(PYBIN)/dbt
 
 export LAB17_DB := $(CURDIR)/warehouse.duckdb
 export DBT_PROFILES_DIR := $(CURDIR)/dbt
+# Mọi file trong repo là UTF-8. Trên Windows, locale mặc định (cp1252) làm dbt
+# đọc dbt_project.yml lỗi -> ép Python dùng UTF-8. Trên Linux vô hại.
+export PYTHONUTF8 := 1
 
 .DEFAULT_GOAL := help
 .PHONY: help setup seed seed-extra pipeline verify quick explain plan dbt-test \
@@ -20,7 +26,7 @@ help:  ## danh sách lệnh
 	@echo ""
 
 setup:  ## venv + thư viện + sinh dữ liệu (chạy một lần)
-	@test -d $(VENV) || python3 -m venv $(VENV)
+	@test -d $(VENV) || $(if $(shell command -v python3),python3,python) -m venv $(VENV)
 	@$(PIP) install -q --upgrade pip
 	@$(PIP) install -q -r requirements.txt
 	@$(PY) seed/generate.py
